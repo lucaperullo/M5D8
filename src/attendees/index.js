@@ -3,7 +3,7 @@ const { getAttendees, writeAttendees } = require("../fsUtilities.js");
 const uniqid = require("uniqid");
 const sgMail = require("@sendgrid/mail");
 const { join } = require("path");
-const { createReadSteam, createReadStream } = require("fs-extra");
+const { createReadStream } = require("fs-extra");
 const { pipeline } = require("stream");
 const { Transform } = require("json2csv");
 
@@ -11,43 +11,52 @@ const attendeesRouter = express.Router();
 
 attendeesRouter.post("/", async (req, res, next) => {
   try {
+    console.log(1);
     const attDB = await getAttendees();
-
+    console.log(2);
     attDB.push({
       ...req.body,
       ID: uniqid(),
     });
+    console.log(3);
     await writeAttendees(attDB);
-
     sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
     const msg = {
-      to: "lucaperullo@outlook.it",
-      from: "lucanontiscordar@gmail.com",
-      subject: "prova",
-      text: "ha",
-      html: "<strong>and yo</strong>",
+      to: req.body.Email,
+      from: "thepoopatroopa@gmail.com",
+      subject: "You're Great!",
+      text: "and everybody knows it!",
+      html: "<strong>and everybody knows it!</strong>",
     };
 
     await sgMail.send(msg);
-    res.send("EMAIL SENT!");
+
+    res.send("SENT");
   } catch (error) {
     console.log(error);
-    next(error);
+    res.status(500).send(error);
   }
 });
 
 attendeesRouter.get("/export/csv", (req, res, next) => {
   try {
-    const pathToJson = join(__dirname, "attendees.json");
-    const jsonReadableStream = createReadStream(pathToJson);
+    const pathToJson = join(__dirname, "attendees.json"); //CREATING PATH TO JSON FILE
+    const jsonReadableStream = createReadStream(pathToJson); //CREATES SOURCE FOR PIPELINE
+    //SOURCE IS THE FILE THAT WE'RE SENDING
 
     const json2csv = new Transform({
       fields: ["FirstName", "Surname", "ToA", "Email", "ID"],
-    });
-    res.setHeader("Content-Disposition", "attachment; filname=export.csv");
+    }); //TURNS JSON FILE INTO A CSV FILE WITH THE FIELDS AS COLUMNS
+
+    res.setHeader("Content-Disposition", "attachment; filename=export.csv"); //SETS ENDPOINT TO DOWNLOAD THE FILES IN THE RESPONSE
     pipeline(jsonReadableStream, json2csv, res, (err) => {
-      next(err);
+      if (err) {
+        console.log(err);
+        next(err);
+      } else {
+        console.log("THIS ONE WORKS");
+      }
     });
   } catch (error) {
     next(error);
